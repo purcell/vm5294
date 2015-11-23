@@ -5,13 +5,13 @@ import           Control.Applicative      (Applicative)
 import           Control.Monad            (when)
 import           Control.Monad.State.Lazy (MonadState, State)
 import qualified Control.Monad.State.Lazy as St
-import           Data.Function            (on)
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
 
 
 type CPUNum = Int
 type VMInt = Int
+type InsCount = Int
 
 data Src = SrcIn
          | SrcA
@@ -23,8 +23,6 @@ data Dest = DestOut
           | DestA
           | DestNull
           | DestCPU CPUNum
-
-newtype InsCount = InsCount { icOffset :: Int }
 
 data Instruction = MOV Src Dest
                  | SWP
@@ -48,15 +46,15 @@ newtype VM a = VM { unVM :: State CPUState a }
 
 run :: [Instruction] -> CPUState
 run program = (St.execState . unVM) execute initState
-  where initState = CPUState (V.fromList program) (InsCount 0) 0 0
+  where initState = CPUState (V.fromList program) 0 0 0
 
 execute :: VM ()
 execute = do
   state <- St.get
-  when (icOffset (cpuInsPointer state) < V.length (cpuProgram state)) $ do
-    if icOffset (cpuInsPointer state) < 0
-      then St.put (state { cpuInsPointer = InsCount 0 })
-      else eval $ (cpuProgram state) V.! icOffset (cpuInsPointer state)
+  when (cpuInsPointer state < V.length (cpuProgram state)) $ do
+    if cpuInsPointer state < 0
+      then St.put (state { cpuInsPointer = 0 })
+      else eval $ cpuProgram state V.! cpuInsPointer state
     execute
 
 
@@ -93,15 +91,15 @@ eval (JLZ count   ) = jumpWhenA (< 0) count
 
 
 jump :: InsCount -> VM ()
-jump count = St.modify (\s -> s { cpuInsPointer = InsCount $ ((+) `on` icOffset) (cpuInsPointer s) count })
+jump count = St.modify (\s -> s { cpuInsPointer = cpuInsPointer s + count })
 
 jumpWhenA :: (VMInt -> Bool) -> InsCount -> VM ()
 jumpWhenA f count = do
   state <- St.get
-  jump (if f (cpuRegA state) then count else InsCount 1)
+  jump (if f (cpuRegA state) then count else 1)
 
 evalAndNext :: VM () -> VM ()
-evalAndNext action = action >> jump (InsCount 1)
+evalAndNext action = action >> jump 1
 
 
 
