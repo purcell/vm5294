@@ -1,7 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main where
 
-import           Control.Applicative      (Applicative)
 import           Control.Monad            (when)
 import           Control.Monad.State.Lazy (MonadState, State)
 import qualified Control.Monad.State.Lazy as St
