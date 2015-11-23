@@ -106,4 +106,12 @@ evalAndNext action = action >> jump (InsCount 1)
 
 
 main :: IO ()
-main = undefined
+main = do
+  let program = [ MOV (SrcInt 1) DestA
+                , SWP
+                , MOV (SrcInt 2) DestA
+                , ADD (SrcInt 3)
+                ]
+  let state = run program
+  putStrLn $ "A: " ++ show (cpuRegA state)
+  putStrLn $ "B: " ++ show (cpuRegB state)
