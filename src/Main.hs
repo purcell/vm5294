@@ -73,20 +73,20 @@ send (DestCPU n) i = undefined
 
 eval :: Instruction -> VM ()
 eval (MOV src dest) = evalAndNext $ receive src >>= send dest
-eval (SWP         ) = evalAndNext $ St.modify (\s -> s { cpuRegA = cpuRegB s
+eval SWP            = evalAndNext $ St.modify (\s -> s { cpuRegA = cpuRegB s
                                                        , cpuRegB = cpuRegA s })
-eval (SAV         ) = evalAndNext $ St.modify (\s -> s { cpuRegB = cpuRegA s })
-eval (ADD src     ) = evalAndNext $ do
+eval SAV            = evalAndNext $ St.modify (\s -> s { cpuRegB = cpuRegA s })
+eval (ADD src)      = evalAndNext $ do
   val <- receive src
   St.modify (\s -> s { cpuRegA = cpuRegA s + val })
-eval (SUB src     ) =  do
+eval (SUB src)      =  do
   val <- receive src
   St.modify (\s -> s { cpuRegA = cpuRegA s - val })
-eval (JMP count   ) = jump count
-eval (JEZ count   ) = jumpWhenA (== 0) count
-eval (JNZ count   ) = jumpWhenA (/= 0) count
-eval (JGZ count   ) = jumpWhenA (> 0) count
-eval (JLZ count   ) = jumpWhenA (< 0) count
+eval (JMP count)    = jump count
+eval (JEZ count)    = jumpWhenA (== 0) count
+eval (JNZ count)    = jumpWhenA (/= 0) count
+eval (JGZ count)    = jumpWhenA (> 0) count
+eval (JLZ count)    = jumpWhenA (< 0) count
 
 
 jump :: InsCount -> VM ()
