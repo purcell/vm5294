@@ -50,10 +50,11 @@ run program = (St.execState . unVM) execute initState
 execute :: VM ()
 execute = do
   state <- St.get
-  when (cpuInsPointer state < V.length (cpuProgram state)) $ do
-    if cpuInsPointer state < 0
+  let pos = cpuInsPointer state
+  when (pos < V.length (cpuProgram state)) $ do
+    if pos < 0
       then St.put (state { cpuInsPointer = 0 })
-      else eval $ cpuProgram state V.! cpuInsPointer state
+      else eval $ cpuProgram state V.! pos
     execute
 
 
