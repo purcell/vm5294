@@ -10,19 +10,19 @@ source = (string "in" >> return SrcIn)
          <|> (string "null" >> return SrcNull)
          <|> (string "a" >> return SrcA)
          <|> liftM SrcInt vmint
-         <|> (char '#' >> liftM SrcCPU cpunum)
+         <|> liftM SrcCPU cpunum
 
 dest :: Parser Dest
 dest = (string "out" >> return DestOut)
        <|> (string "a" >> return DestA)
        <|> (string "null" >> return DestNull)
-       <|> (char '#' >> liftM DestCPU cpunum)
+       <|> liftM DestCPU cpunum
 
 nat :: Parser Int
 nat = read <$> many1 digit
 
 cpunum :: Parser CPUNum
-cpunum = nat
+cpunum = char '#' >> nat <?> "cpu number"
 
 vmint :: Parser VMInt
 vmint = do
@@ -44,11 +44,14 @@ instruction = (string "mov" >> skipMany1 space >> (MOV <$> (source <* skipMany s
               <|> try (string "jlz" >> skipMany1 space >> (JLZ <$> vmint))
               <?> "instruction"
 
-program :: Parser [Instruction]
-program = many (instruction <* skipMany space <* optional comment <* endOfLine)
+lineWithOptionalComment :: Parser a -> Parser a
+lineWithOptionalComment p = p <* skipMany space <* optional comment <* endOfLine
   where comment = char '~' >> skipMany (noneOf "\r\n")
 
+program :: Parser Program
+program = Program <$> lineWithOptionalComment cpunum
+                  <*> many (lineWithOptionalComment instruction)
 
 
-parseFile :: String -> IO (Either ParseError [Instruction])
-parseFile = parseFromFile program
+parseFile :: String -> IO (Either ParseError [Program])
+parseFile = parseFromFile (many1 program <* eof)

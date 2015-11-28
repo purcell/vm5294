@@ -1,0 +1,23 @@
+#0              ~ defines program for CPU #0
+mov in, #1      ~ accept integer from input bus, sends to CPU #1
+mov in, a       ~ accept integer from input bus, store in a register
+mov a, #1       ~ send a register to CPU #1
+sub #1          ~ accept int from CPU #1, subtract a and store in a
+jlz +4          ~ if a is less than 0, jump forwards 4 instructions
+mov #1, null    ~ accept int from CPU #1 and throw it away
+mov #1, out     ~ accept int from CPU #1 and send to output bus
+jmp -100        ~ jump to the start of the program
+mov #1, out     ~ accept int from CPU #1 and send to output bus
+mov #1, null    ~ accept int from CPU #1 and throw it away
+jmp -100        ~ jump to the start of the program
+#1              ~ defines program for CPU #1
+mov #0, a       ~ accept integer from CPU #0, store in a register
+sav             ~ copy a register to b register
+mov #0, a       ~ accept integer from CPU #0, store in a register
+swp             ~ swap a and b registers
+mov a, #0       ~ send a register to CPU #0
+swp             ~ swap a and b registers
+mov a, #0       ~ send a register to CPU #0
+swp             ~ swap a and b registers
+mov a, #0       ~ send a register to CPU #0
+jmp -1000       ~ jump to the start of the program

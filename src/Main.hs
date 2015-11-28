@@ -3,7 +3,6 @@ module Main where
 import           Eval
 import           Parse
 import           System.Environment (getArgs)
-import           Types
 
 
 runFile :: FilePath -> IO ()
@@ -11,10 +10,7 @@ runFile sourceFile = do
   parseResult <- parseFile sourceFile
   case parseResult of
     Left err -> print err
-    Right program -> do
-      state <- run readInt writeInt program
-      putStrLn $ "A: " ++ show (cpuRegA state)
-      putStrLn $ "B: " ++ show (cpuRegB state)
+    Right program -> run readInt writeInt program
   where
     readInt = read <$> getLine
     writeInt = print

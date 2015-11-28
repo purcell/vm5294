@@ -1,8 +1,5 @@
 module Types where
 
-import           Control.Monad.State.Lazy (StateT)
-import           Data.Vector              (Vector)
-
 type CPUNum = Int
 type VMInt = Int
 type InsCount = Int
@@ -32,12 +29,6 @@ data Instruction = MOV Src Dest
                  | JLZ InsCount
                  deriving Show
 
-data CPUState = CPUState { cpuProgram    :: Vector Instruction
-                         , cpuInsPointer :: InsCount
-                         , cpuRegA       :: VMInt
-                         , cpuRegB       :: VMInt
-                         , cpuReadInt    :: VM VMInt
-                         , cpuWriteInt   :: VMInt -> VM ()
-                         }
-
-type VM a = StateT CPUState IO a
+data Program = Program { progCPU          :: CPUNum
+                       , progInstructions :: [Instruction]
+                       }

@@ -1,24 +1,61 @@
 module Eval (run)
        where
 
-import           Control.Monad            (when)
+import           Control.Concurrent.Async
+import           Control.Concurrent.MVar
+import           Control.Monad
+import           Control.Monad.State.Lazy (StateT)
 import qualified Control.Monad.State.Lazy as St
+import qualified Data.Map.Strict          as M
+import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
 import           Types
 
+data CPUState = CPUState { cpuNum          :: CPUNum
+                         , cpuInstructions :: Vector Instruction
+                         , cpuInsPointer   :: InsCount
+                         , cpuRegA         :: VMInt
+                         , cpuRegB         :: VMInt
+                         , cpuReadInt      :: VM VMInt
+                         , cpuWriteInt     :: VMInt -> VM ()
+                         , cpuAsk          :: CPUNum -> VM VMInt
+                         , cpuTell         :: CPUNum -> VMInt -> VM ()
+                         }
 
-run :: IO VMInt -> (VMInt -> IO ()) -> [Instruction] -> IO CPUState
-run readInt writeInt program = St.execStateT execute initState
-  where initState = CPUState (V.fromList program) 0 0 0 (St.lift readInt) (St.lift . writeInt)
+type VM a = StateT CPUState IO a
+
+run :: IO VMInt -> (VMInt -> IO ()) -> [Program] -> IO ()
+run readInt writeInt programs = do
+  channels <- makeChannels programs
+  void $ mapConcurrently (runCPU channels) programs
+  where
+    runCPU channels program = St.evalStateT execute initState
+      where
+        initState = CPUState mynum (V.fromList $ progInstructions program) 0 0 0 (St.lift readInt) (St.lift . writeInt) (ask channels mynum) (tell channels mynum)
+        mynum = progCPU program
+    ask channels me n = St.lift $ takeMVar (channels M.! (n, me))
+    tell channels me n i = St.lift $ putMVar (channels M.! (me, n)) i
+
+
+type Channels = (M.Map (CPUNum, CPUNum) (MVar VMInt))
+
+makeChannels :: [Program] -> IO Channels
+makeChannels programs = M.fromList <$> forM pairs (\p -> (,) p <$> newEmptyMVar)
+  where cpuNums = map progCPU programs
+        pairs = [(a, b) | a <- cpuNums, b <- cpuNums, a /= b]
+
 
 execute :: VM ()
 execute = do
   state <- St.get
   let pos = cpuInsPointer state
-  when (pos < V.length (cpuProgram state)) $ do
+  when (pos < V.length (cpuInstructions state)) $ do
     if pos < 0
       then St.put (state { cpuInsPointer = 0 })
-      else eval $ cpuProgram state V.! pos
+      else do
+        let instr = cpuInstructions state V.! pos
+        -- St.lift $ putStrLn ("#" ++ show (cpuNum state) ++ " -- " ++ show instr)
+        eval instr
     execute
 
 
@@ -27,13 +64,16 @@ receive SrcIn      = cpuReadInt =<< St.get
 receive SrcA       = St.liftM cpuRegA St.get
 receive SrcNull    = return 0
 receive (SrcInt n) = return n
-receive (SrcCPU n) = undefined
+receive (SrcCPU n) = flip cpuAsk n =<< St.get
 
 send :: Dest -> VMInt -> VM ()
 send DestOut     i = flip cpuWriteInt i =<< St.get
 send DestA       i = St.modify $ \s -> s { cpuRegA = i }
-send DestNull    i = return ()
-send (DestCPU n) i = undefined
+send DestNull    _ = return ()
+send (DestCPU n) i = do
+  s <- St.get
+  let tell = cpuTell s
+  tell n i
 
 
 eval :: Instruction -> VM ()
@@ -44,7 +84,7 @@ eval SAV            = evalAndNext $ St.modify (\s -> s { cpuRegB = cpuRegA s })
 eval (ADD src)      = evalAndNext $ do
   val <- receive src
   St.modify (\s -> s { cpuRegA = cpuRegA s + val })
-eval (SUB src)      =  do
+eval (SUB src)      =  evalAndNext $ do
   val <- receive src
   St.modify (\s -> s { cpuRegA = cpuRegA s - val })
 eval (JMP count)    = jump count
