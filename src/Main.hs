@@ -1,8 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main where
 
 import           Control.Monad            (when)
-import           Control.Monad.State.Lazy (MonadState, State)
+import           Control.Monad.State.Lazy (StateT)
 import qualified Control.Monad.State.Lazy as St
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
@@ -38,14 +37,15 @@ data CPUState = CPUState { cpuProgram    :: Vector Instruction
                          , cpuInsPointer :: InsCount
                          , cpuRegA       :: VMInt
                          , cpuRegB       :: VMInt
+                         , cpuReadInt    :: VM VMInt
+                         , cpuWriteInt   :: VMInt -> VM ()
                          }
 
-newtype VM a = VM { unVM :: State CPUState a }
-             deriving (Functor, Applicative, Monad, MonadState CPUState)
+type VM a = StateT CPUState IO a
 
-run :: [Instruction] -> CPUState
-run program = (St.execState . unVM) execute initState
-  where initState = CPUState (V.fromList program) 0 0 0
+run :: IO VMInt -> (VMInt -> IO ()) -> [Instruction] -> IO CPUState
+run readInt writeInt program = St.execStateT execute initState
+  where initState = CPUState (V.fromList program) 0 0 0 (St.lift readInt) (St.lift . writeInt)
 
 execute :: VM ()
 execute = do
@@ -59,14 +59,14 @@ execute = do
 
 
 receive :: Src -> VM VMInt
-receive SrcIn      = undefined
+receive SrcIn      = cpuReadInt =<< St.get
 receive SrcA       = St.liftM cpuRegA St.get
 receive SrcNull    = return 0
 receive (SrcInt n) = return n
 receive (SrcCPU n) = undefined
 
 send :: Dest -> VMInt -> VM ()
-send DestOut     i = undefined
+send DestOut     i = flip cpuWriteInt i =<< St.get
 send DestA       i = St.modify $ \s -> s { cpuRegA = i }
 send DestNull    i = return ()
 send (DestCPU n) i = undefined
@@ -109,7 +109,13 @@ main = do
                 , SWP
                 , MOV (SrcInt 2) DestA
                 , ADD (SrcInt 3)
+                , MOV SrcIn DestA
+                , MOV SrcA DestOut
                 ]
-  let state = run program
+  state <- run readInt writeInt program
   putStrLn $ "A: " ++ show (cpuRegA state)
   putStrLn $ "B: " ++ show (cpuRegB state)
+
+  where
+    readInt = read <$> getLine
+    writeInt = print
