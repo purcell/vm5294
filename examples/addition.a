@@ -1,0 +1,6 @@
+mov in, a       ~ accept integer from input bus, store in a register
+jez +4          ~ if a equals 0, jump to the end of the program
+add in          ~ add integer from input bus to a, store result in a
+mov a, out      ~ writes register a to output bus
+jmp -4          ~ jumps back to start of program
+

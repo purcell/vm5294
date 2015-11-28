@@ -12,11 +12,13 @@ data Src = SrcIn
          | SrcNull
          | SrcInt VMInt
          | SrcCPU CPUNum
+         deriving Show
 
 data Dest = DestOut
           | DestA
           | DestNull
           | DestCPU CPUNum
+          deriving Show
 
 data Instruction = MOV Src Dest
                  | SWP
@@ -28,6 +30,7 @@ data Instruction = MOV Src Dest
                  | JNZ InsCount
                  | JGZ InsCount
                  | JLZ InsCount
+                 deriving Show
 
 data CPUState = CPUState { cpuProgram    :: Vector Instruction
                          , cpuInsPointer :: InsCount
