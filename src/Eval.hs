@@ -1,10 +1,12 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Eval (run)
        where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Monad
-import           Control.Monad.State.Lazy (StateT)
+import           Control.Monad.IO.Class
+import           Control.Monad.State.Lazy (MonadState, StateT)
 import qualified Control.Monad.State.Lazy as St
 import qualified Data.Map                 as M
 import           Data.Vector              (Vector)
@@ -22,19 +24,20 @@ data CPUState = CPUState { cpuNum          :: CPUNum
                          , cpuTell         :: CPUNum -> VMInt -> VM ()
                          }
 
-type VM a = StateT CPUState IO a
+newtype VM a = VM { runVM :: StateT CPUState IO a }
+               deriving (Functor, Applicative, Monad, MonadIO, MonadState CPUState)
 
 run :: IO VMInt -> (VMInt -> IO ()) -> [Program] -> IO ()
 run readInt writeInt programs = do
   channels <- makeChannels programs
   void $ mapConcurrently (runCPU channels) programs
   where
-    runCPU channels program = St.evalStateT execute initState
+    runCPU channels program = St.evalStateT (runVM execute) initState
       where
-        initState = CPUState mynum (V.fromList $ progInstructions program) 0 0 0 (St.lift readInt) (St.lift . writeInt) (ask channels mynum) (tell channels mynum)
+        initState = CPUState mynum (V.fromList $ progInstructions program) 0 0 0 (liftIO readInt) (liftIO . writeInt) (ask channels mynum) (tell channels mynum)
         mynum = progCPU program
-    ask channels me n = St.lift $ takeMVar (channels M.! (n, me))
-    tell channels me n i = St.lift $ putMVar (channels M.! (me, n)) i
+    ask channels me n = liftIO $ takeMVar (channels M.! (n, me))
+    tell channels me n i = liftIO $ putMVar (channels M.! (me, n)) i
 
 
 type Channels = M.Map (CPUNum, CPUNum) (MVar VMInt)
@@ -54,7 +57,7 @@ execute = do
       then St.put (state { cpuInsPointer = 0 })
       else do
         let instr = cpuInstructions state V.! pos
-        -- St.lift $ putStrLn ("#" ++ show (cpuNum state) ++ " -- " ++ show instr)
+        -- liftIO $ putStrLn ("#" ++ show (cpuNum state) ++ " -- " ++ show instr)
         eval instr
     execute
 
