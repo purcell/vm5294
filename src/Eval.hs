@@ -6,7 +6,7 @@ import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.State.Lazy (StateT)
 import qualified Control.Monad.State.Lazy as St
-import qualified Data.Map.Strict          as M
+import qualified Data.Map                 as M
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
 import           Types
@@ -37,7 +37,7 @@ run readInt writeInt programs = do
     tell channels me n i = St.lift $ putMVar (channels M.! (me, n)) i
 
 
-type Channels = (M.Map (CPUNum, CPUNum) (MVar VMInt))
+type Channels = M.Map (CPUNum, CPUNum) (MVar VMInt)
 
 makeChannels :: [Program] -> IO Channels
 makeChannels programs = M.fromList <$> forM pairs (\p -> (,) p <$> newEmptyMVar)
